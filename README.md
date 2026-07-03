@@ -1,7 +1,7 @@
-# Vi DB Connect
+# ViDBA
 
 <p align="center">
-  <img src="frontend/public/app-icon.png" alt="Vi DB Connect app icon" width="128" height="128">
+  <img src="frontend/public/app-icon.png" alt="ViDBA app icon" width="128" height="128">
 </p>
 
 <p align="center">
@@ -14,9 +14,10 @@
   <img alt="Linux" src="https://img.shields.io/badge/Linux-supported-FCC624?logo=linux&logoColor=black">
   <img alt="AI SQL experimental" src="https://img.shields.io/badge/AI%20SQL-Experimental-ff9800">
   <img alt="Oracle beta" src="https://img.shields.io/badge/Oracle-Beta-7952B3">
+  <img alt="License GPL-3.0" src="https://img.shields.io/badge/License-GPL--3.0-blue">
 </p>
 
-Vi DB Connect is a lightweight cross-platform desktop database client built with
+ViDBA is a lightweight cross-platform desktop database client built with
 Tauri 2, Rust, Vue 3, and TypeScript. It is designed for day-to-day database
 workflows such as connecting to multiple database engines, browsing schemas,
 running SQL, reviewing history, and exporting or importing data.
@@ -26,9 +27,9 @@ small installer size, responsive desktop performance, and a clean modern UI.
 
 ## Samples
 
-| Workspace | Query editor | Settings |
+| Workspace | Query editor | Workspace |
 | --- | --- | --- |
-| ![Vi DB Connect workspace sample](samples/anh1.png) | ![Vi DB Connect query editor sample](samples/anh2.png) | ![Vi DB Connect settings sample](samples/anh3.png) |
+| ![ViDBA workspace sample](samples/anh1.png) | ![ViDBA query editor sample](samples/anh2.png) | ![ViDBA workspace sample](samples/anh3.png) |
 
 ## Features
 
@@ -143,7 +144,7 @@ cargo test -p ViDBA <test_name>
 
 ## Architecture
 
-Vi DB Connect follows a layered desktop architecture:
+ViDBA follows a layered desktop architecture:
 
 ```text
 Vue 3 Frontend (frontend/src)
@@ -206,30 +207,13 @@ the available context window. This feature is experimental: prompts, provider
 settings, local model support, and generated SQL quality may change between
 releases.
 
-<!--
 ## Donate
 
-If Vi DB Connect helps your workflow, donations and sponsorships are welcome.
+If ViDBA helps your workflow, donations and sponsorships are welcome.
 
-Donation links have not been configured in this repository yet. Maintainers can
-add links here, for example:
-
-- GitHub Sponsors: `https://github.com/sponsors/<your-name>`
-- Ko-fi: `https://ko-fi.com/<your-name>`
-- Buy Me a Coffee: `https://www.buymeacoffee.com/<your-name>`
-- PayPal: `https://paypal.me/<your-name>`
--->
+- GitHub Sponsors: [sponsors/spyhunter88](https://github.com/sponsors/spyhunter88)
 
 ## License
 
-No project license has been selected yet.
-
-Until a `LICENSE` file is added and the `license` field in
-`src-tauri/Cargo.toml` is updated, this repository should be treated as
-copyrighted with all rights reserved. That means the source is visible, but no
-explicit permission has been granted for redistribution, modification, or
-commercial use.
-
-Before publishing or accepting external contributions, choose a license and add
-it to the repository. Common choices include MIT, Apache-2.0, GPL-3.0, and
-AGPL-3.0, depending on the intended distribution and contribution model.
+ViDBA is licensed under the GNU General Public License v3.0. See `LICENSE` for
+details.
