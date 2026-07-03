@@ -1,5 +1,21 @@
 # Vi DB Connect
 
+<p align="center">
+  <img src="frontend/public/app-icon.png" alt="Vi DB Connect app icon" width="128" height="128">
+</p>
+
+<p align="center">
+  <img alt="Tauri 2" src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white">
+  <img alt="Rust" src="https://img.shields.io/badge/Rust-1.77%2B-000000?logo=rust&logoColor=white">
+  <img alt="Vue 3" src="https://img.shields.io/badge/Vue-3-42B883?logo=vue.js&logoColor=white">
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white">
+  <img alt="Windows" src="https://img.shields.io/badge/Windows-supported-0078D4?logo=windows&logoColor=white">
+  <img alt="macOS" src="https://img.shields.io/badge/macOS-supported-000000?logo=apple&logoColor=white">
+  <img alt="Linux" src="https://img.shields.io/badge/Linux-supported-FCC624?logo=linux&logoColor=black">
+  <img alt="AI SQL experimental" src="https://img.shields.io/badge/AI%20SQL-Experimental-ff9800">
+  <img alt="Oracle beta" src="https://img.shields.io/badge/Oracle-Beta-7952B3">
+</p>
+
 Vi DB Connect is a lightweight cross-platform desktop database client built with
 Tauri 2, Rust, Vue 3, and TypeScript. It is designed for day-to-day database
 workflows such as connecting to multiple database engines, browsing schemas,
@@ -7,6 +23,12 @@ running SQL, reviewing history, and exporting or importing data.
 
 The project is inspired by tools like DBeaver and Navicat, with a focus on a
 small installer size, responsive desktop performance, and a clean modern UI.
+
+## Samples
+
+| Workspace | Query editor | Settings |
+| --- | --- | --- |
+| ![Vi DB Connect workspace sample](samples/anh1.png) | ![Vi DB Connect query editor sample](samples/anh2.png) | ![Vi DB Connect settings sample](samples/anh3.png) |
 
 ## Features
 
@@ -19,7 +41,7 @@ small installer size, responsive desktop performance, and a clean modern UI.
   - SQL Server
   - SQLite
   - MongoDB
-  - Oracle, behind the optional `oracle` Cargo feature
+  - Oracle, behind the optional `oracle` Cargo feature. Oracle support is currently beta.
 - SQL editor with formatting, snippets, completion helpers, and linting support.
 - Query execution with result grids, affected rows, column metadata, and timing.
 - Multi-tab workspace for SQL queries, table data, table structure, views, and routines.
@@ -27,7 +49,7 @@ small installer size, responsive desktop performance, and a clean modern UI.
 - Query history and saved result snapshots.
 - Import and export workflows, including CSV and spreadsheet-oriented support.
 - Schema cache with background synchronization.
-- AI-assisted SQL generation with local, integrated, and cloud modes.
+- AI-assisted SQL generation with local, integrated, and cloud modes. This feature is currently experimental.
 - Separate desktop windows for history, settings, import, and export views.
 
 ## Tech Stack
@@ -47,7 +69,9 @@ Install the following before running the project:
 - Database client/runtime requirements for the database engines you want to use
 
 For Oracle support, build with the optional `oracle` feature and make sure the
-required Oracle client libraries are available on the target machine.
+required Oracle client libraries are available on the target machine. Oracle
+support is currently beta while driver behavior and packaging requirements are
+being stabilized across platforms.
 
 ## Development
 
@@ -166,6 +190,10 @@ Important backend areas:
 
 ## AI SQL Generation
 
+<p>
+  <img alt="AI SQL experimental" src="https://img.shields.io/badge/Status-Experimental-ff9800">
+</p>
+
 AI-assisted SQL generation is coordinated by the Rust backend and can run in
 three modes:
 
@@ -174,8 +202,11 @@ three modes:
 - Cloud: external API providers such as OpenAI, Grok, or Gemini.
 
 Schema context is compacted before it is sent to a model so prompts stay within
-the available context window.
+the available context window. This feature is experimental: prompts, provider
+settings, local model support, and generated SQL quality may change between
+releases.
 
+<!--
 ## Donate
 
 If Vi DB Connect helps your workflow, donations and sponsorships are welcome.
@@ -187,6 +218,7 @@ add links here, for example:
 - Ko-fi: `https://ko-fi.com/<your-name>`
 - Buy Me a Coffee: `https://www.buymeacoffee.com/<your-name>`
 - PayPal: `https://paypal.me/<your-name>`
+-->
 
 ## License
 
