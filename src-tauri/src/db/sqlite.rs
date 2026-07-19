@@ -275,18 +275,15 @@ impl SqliteDatabase {
             _ => Some(val.to_string().trim_matches('"').to_string()),
         }
     }
-}
 
-#[async_trait]
-impl Database for SqliteDatabase {
-    /// Executes a SQL query. For SELECTs, it returns rows and metadata.
-    /// For other statements, it returns affected rows.
-    async fn execute_query(
+    /// Runs a single statement on an already-acquired connection. Shared by `execute_query`
+    /// and `execute_script` so that a whole script runs on one connection (temporary tables
+    /// and transactions in SQLite are connection-scoped).
+    async fn exec_stmt(
         &self,
+        conn: &mut sqlx::SqliteConnection,
         query: &str,
         table_name: Option<String>,
-        _catalog: Option<String>,
-        _schema: Option<String>,
     ) -> Result<QueryResult, String> {
         let start = Instant::now();
         let info = utils::parse_query(query, table_name);
@@ -299,7 +296,7 @@ impl Database for SqliteDatabase {
             };
 
             let rows = sqlx::query(query)
-                .fetch_all(&self.pool)
+                .fetch_all(&mut *conn)
                 .await
                 .map_err(|e| e.to_string())?;
             let fallback = if rows.is_empty() {
@@ -321,7 +318,7 @@ impl Database for SqliteDatabase {
             )
         } else {
             let res = sqlx::query(query)
-                .execute(&self.pool)
+                .execute(&mut *conn)
                 .await
                 .map_err(|e| e.to_string())?;
             Ok(QueryResult {
@@ -334,6 +331,46 @@ impl Database for SqliteDatabase {
                 table_name: None,
             })
         }
+    }
+}
+
+#[async_trait]
+impl Database for SqliteDatabase {
+    /// Executes a SQL query. For SELECTs, it returns rows and metadata.
+    /// For other statements, it returns affected rows.
+    async fn execute_query(
+        &self,
+        query: &str,
+        table_name: Option<String>,
+        _catalog: Option<String>,
+        _schema: Option<String>,
+    ) -> Result<QueryResult, String> {
+        let mut conn = self.pool.acquire().await.map_err(|e| e.to_string())?;
+        self.exec_stmt(&mut conn, query, table_name).await
+    }
+
+    async fn execute_script(
+        &self,
+        statements: &[String],
+        table_name: Option<String>,
+        _catalog: Option<String>,
+        _schema: Option<String>,
+    ) -> Result<Vec<QueryResult>, String> {
+        if statements.is_empty() {
+            return Ok(vec![]);
+        }
+
+        // Temporary tables and transactions in SQLite live on a single connection, so run
+        // the entire script on one acquired connection rather than one-per-statement.
+        let mut conn = self.pool.acquire().await.map_err(|e| e.to_string())?;
+        let mut results = Vec::with_capacity(statements.len());
+        for stmt in statements {
+            let r = self
+                .exec_stmt(&mut conn, stmt, table_name.clone())
+                .await?;
+            results.push(r);
+        }
+        Ok(results)
     }
 
     /// Fetches a list of all user-defined tables from sqlite_master.

@@ -374,7 +374,7 @@ export function provideSqlCompletions(
         kind: monaco.languages.CompletionItemKind.Snippet,
         detail: `[SQL Help] ${snippet.description}`,
         documentation: {
-          value: `Dialect: ${dbType}\nCategory: ${snippet.category}\n\nCú pháp:\n\`\`\`sql\n${dialectInfo.code}\n\`\`\`\n\nVí dụ:\n\`\`\`sql\n${dialectInfo.example}\n\`\`\``
+          value: `Dialect: ${dbType}\nCategory: ${snippet.category}\n\nSyntax:\n\`\`\`sql\n${dialectInfo.code}\n\`\`\`\n\nExample:\n\`\`\`sql\n${dialectInfo.example}\n\`\`\``
         },
         insertText: dialectInfo.code,
         insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,

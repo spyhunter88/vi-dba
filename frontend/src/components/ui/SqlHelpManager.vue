@@ -35,11 +35,11 @@ const copiedSnippetId = ref<string | null>(null);
 
 // Category mappings
 const categories = [
-  { id: 'all', name: 'Tất cả' },
-  { id: 'datetime', name: 'Ngày & Giờ' },
-  { id: 'timezone', name: 'Múi giờ' },
+  { id: 'all', name: 'All' },
+  { id: 'datetime', name: 'Date & Time' },
+  { id: 'timezone', name: 'Timezone' },
   { id: 'json', name: 'JSON' },
-  { id: 'conditionals', name: 'Điều kiện' },
+  { id: 'conditionals', name: 'Conditionals' },
   { id: 'window', name: 'Window Fn' }
 ];
 
@@ -236,14 +236,14 @@ function toggleCollapse(tableName: string) {
         :class="{ active: activeTab === 'snippets' }"
         @click="activeTab = 'snippets'"
       >
-        Cú pháp
+        Syntax
       </button>
-      <button 
-        class="tab-btn" 
+      <button
+        class="tab-btn"
         :class="{ active: activeTab === 'context' }"
         @click="activeTab = 'context'"
       >
-        Ngữ cảnh
+        Context
         <span v-if="referencedTables.length > 0" class="badge">
           {{ referencedTables.length }}
         </span>
@@ -259,7 +259,7 @@ function toggleCollapse(tableName: string) {
           <input 
             v-model="searchIndex" 
             type="text" 
-            placeholder="Tìm kiếm cú pháp..." 
+            placeholder="Search syntax..."
             class="search-input"
           />
           <button v-if="searchIndex" class="clear-search" @click="searchIndex = ''">
@@ -283,7 +283,7 @@ function toggleCollapse(tableName: string) {
         <!-- List of snippets -->
         <div v-if="filteredSnippets.length === 0" class="state-box empty">
           <HelpCircle :size="20" class="state-icon" />
-          <span class="state-text">Không tìm thấy mẫu phù hợp</span>
+          <span class="state-text">No matching snippets found</span>
         </div>
         <div v-else class="snippets-list">
           <div 
@@ -307,7 +307,7 @@ function toggleCollapse(tableName: string) {
                   title="Insert into editor"
                   @click="handleInsert(snippet.dialects[selectedDialect]?.code || '')"
                 >
-                  Chèn
+                  Insert
                 </button>
               </div>
             </div>
@@ -315,10 +315,10 @@ function toggleCollapse(tableName: string) {
             <p class="snippet-desc">{{ snippet.description }}</p>
             
             <div class="code-preview-box">
-              <div class="code-label">Cú pháp:</div>
+              <div class="code-label">Syntax:</div>
               <pre class="code-pre"><code>{{ snippet.dialects[selectedDialect]?.code }}</code></pre>
-              
-              <div class="code-label" style="margin-top: 4px;">Ví dụ:</div>
+
+              <div class="code-label" style="margin-top: 4px;">Example:</div>
               <pre class="code-pre example"><code>{{ snippet.dialects[selectedDialect]?.example }}</code></pre>
             </div>
           </div>
@@ -329,12 +329,12 @@ function toggleCollapse(tableName: string) {
       <div v-else-if="activeTab === 'context'" class="context-tab">
         <div v-if="!connectionId" class="state-box">
           <Database :size="20" class="state-icon" />
-          <span class="state-text">Chưa kết nối database</span>
+          <span class="state-text">Not connected to a database</span>
         </div>
         
         <div v-else-if="referencedTables.length === 0" class="state-box info">
           <Sparkles :size="20" class="state-icon text-accent" />
-          <span class="state-text">Nhập tên bảng trong câu query (ví dụ: <code>FROM table_name</code>) để xem mô tả.</span>
+          <span class="state-text">Type a table name in the query (e.g. <code>FROM table_name</code>) to see its description.</span>
         </div>
 
         <div v-else class="tables-list">
@@ -360,10 +360,10 @@ function toggleCollapse(tableName: string) {
             <div v-if="!collapsedTables[table]" class="table-card-body">
               <!-- Loading/Empty state -->
               <div v-if="loadingTables[table]" class="loading-placeholder">
-                Đang tải schema...
+                Loading schema...
               </div>
               <div v-else-if="!tableDefinitions[table] || !tableDefinitions[table].columns.length" class="loading-placeholder error">
-                Không tìm thấy thông tin bảng
+                Table information not found
               </div>
               
               <div v-else>
@@ -384,7 +384,7 @@ function toggleCollapse(tableName: string) {
                       <div class="col-name-type">
                         <span 
                           class="col-name" 
-                          title="Click để chèn tên cột"
+                          title="Click to insert column name"
                           @click="handleInsert(col.name)"
                         >
                           {{ col.name }}
@@ -404,7 +404,7 @@ function toggleCollapse(tableName: string) {
                       <button 
                         v-if="isTimestampColumn(col)" 
                         class="convert-btn" 
-                        title="Phát hiện epoch/timestamp! Click để chèn cú pháp convert sang DateTime"
+                        title="Epoch/timestamp detected! Click to insert the DateTime conversion syntax"
                         @click="handleInsert(getTimestampConversion(col))"
                       >
                         ⚡ Convert

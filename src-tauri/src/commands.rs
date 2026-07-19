@@ -55,6 +55,41 @@ pub async fn execute_query(
         .await
 }
 
+/// Result of executing a multi-statement script: one `QueryResult` per statement, plus the
+/// statement texts (in execution order) so the UI can label each result.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScriptResult {
+    pub results: Vec<QueryResult>,
+    pub statements: Vec<String>,
+}
+
+/// Executes a SQL script (one or more statements) on the specified connection.
+///
+/// Unlike calling `execute_query` per statement, the whole script runs on a single
+/// connection, so session-scoped state — transactions (`BEGIN`/`COMMIT`), temporary tables,
+/// session variables — is preserved across statements. Statements are split server-side with
+/// a SQL-aware splitter (respecting quotes, comments and dollar-quoted bodies).
+#[tauri::command]
+pub async fn execute_script(
+    id: String,
+    query: String,
+    table_name: Option<String>,
+    database: Option<String>,
+    schema: Option<String>,
+    exec_id: Option<String>,
+    db_manager: State<'_, DbManager>,
+) -> Result<ScriptResult, String> {
+    let statements = crate::db::utils::split_sql_statements(&query);
+    let results = db_manager
+        .execute_script(&id, statements.clone(), table_name, database, schema, exec_id)
+        .await?;
+    Ok(ScriptResult {
+        results,
+        statements,
+    })
+}
+
 /// Cancels an in-flight query started via `execute_query` with the given `exec_id`.
 /// Returns true if an active query was found and aborted.
 #[tauri::command]

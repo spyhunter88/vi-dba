@@ -10,7 +10,6 @@ import SnapshotManager from '../ui/SnapshotManager.vue';
 import type { RoutineDefinition } from '../../types';
 import * as monaco from 'monaco-editor';
 import { registerSqlCompletionProvider } from '../../utils/sqlCompletion';
-import { parseAndLintSql } from '../../utils/sqlLinter';
 import { registerGlobalFormattingProvider } from '../../utils/sqlFormatter';
 
 const props = defineProps<{
@@ -77,7 +76,6 @@ onMounted(async () => {
         tab.value.content = definition.value;
         tab.value.isDirty = definition.value !== originalDefinition.value;
       }
-      triggerLinter();
     });
 
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
@@ -92,9 +90,7 @@ onMounted(async () => {
     // Initial layout
     setTimeout(() => editor?.layout(), 100);
 
-    loadSchema().then(() => {
-      runLinter();
-    });
+    loadSchema();
     registerAutocomplete();
   }
 
@@ -136,26 +132,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   editor?.dispose();
   completionProvider?.dispose();
-  clearTimeout(lintTimeout);
 });
-
-let lintTimeout: any = null;
-function runLinter() {
-  if (!editor) return;
-  const model = editor.getModel();
-  if (!model) return;
-  const markers = parseAndLintSql(model, cachedSchema.value);
-  monaco.editor.setModelMarkers(model, 'sql-linter', markers);
-}
-
-function triggerLinter() {
-  clearTimeout(lintTimeout);
-  lintTimeout = setTimeout(runLinter, 500);
-}
-
-watch(() => cachedSchema.value, () => {
-  runLinter();
-}, { deep: true });
 
 function handleFormat() {
   if (!editor) return;

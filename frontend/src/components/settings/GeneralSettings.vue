@@ -57,6 +57,31 @@
 
       <div class="settings-row">
         <div class="row-label">
+          <span>Oracle Client Library Path</span>
+          <p>Folder containing the Oracle Instant Client (OCI) libraries. Used only for Oracle connections; prepended to PATH on startup. Requires an app restart to take effect.</p>
+        </div>
+        <div class="row-action flex-col gap-2">
+          <div class="flex gap-2">
+            <input
+              type="text"
+              v-model="settings.oracleLibDir"
+              class="settings-input flex-1"
+              placeholder="e.g. C:\oracle\instantclient_21_13"
+            >
+            <button class="btn btn-secondary btn-sm" @click="browseOracleLibDir">Browse</button>
+          </div>
+          <button
+            class="btn btn-primary btn-sm self-end"
+            @click="saveSettings"
+            :disabled="saving"
+          >
+            {{ saving ? 'Saving...' : 'Save' }}
+          </button>
+        </div>
+      </div>
+
+      <div class="settings-row">
+        <div class="row-label">
           <span>Clear All Schema Cache</span>
           <p>Remove all cached database schemas from the local database.</p>
         </div>
@@ -88,7 +113,8 @@ import { open } from '@tauri-apps/plugin-dialog';
 
 const settings = ref({
   appDataPath: '',
-  schemaCacheTtl: 60
+  schemaCacheTtl: 60,
+  oracleLibDir: ''
 });
 const saving = ref(false);
 
@@ -97,6 +123,7 @@ onMounted(async () => {
     const res = await invoke<any>('get_app_settings');
     settings.value.appDataPath = res.appDataPath || '';
     settings.value.schemaCacheTtl = res.schemaCacheTtl ?? 60;
+    settings.value.oracleLibDir = res.oracleLibDir || '';
   } catch (error) {
     console.error('Failed to load settings:', error);
   }
@@ -109,9 +136,25 @@ const browsePath = async () => {
       multiple: false,
       title: 'Select App Data Directory'
     });
-    
+
     if (selected && typeof selected === 'string') {
       settings.value.appDataPath = selected;
+    }
+  } catch (error) {
+    console.error('Failed to browse path:', error);
+  }
+};
+
+const browseOracleLibDir = async () => {
+  try {
+    const selected = await open({
+      directory: true,
+      multiple: false,
+      title: 'Select Oracle Client (Instant Client) Directory'
+    });
+
+    if (selected && typeof selected === 'string') {
+      settings.value.oracleLibDir = selected;
     }
   } catch (error) {
     console.error('Failed to browse path:', error);
@@ -121,11 +164,15 @@ const browsePath = async () => {
 const saveSettings = async () => {
   saving.value = true;
   try {
-    await invoke('update_app_settings', { 
-      settings: { 
+    // Merge onto the current settings so we never clobber fields owned by other panels.
+    const current: any = (await invoke('get_app_settings')) || {};
+    await invoke('update_app_settings', {
+      settings: {
+        ...current,
         appDataPath: settings.value.appDataPath || null,
-        schemaCacheTtl: settings.value.schemaCacheTtl || 0
-      } 
+        schemaCacheTtl: settings.value.schemaCacheTtl || 0,
+        oracleLibDir: settings.value.oracleLibDir || null
+      }
     });
     alert('Settings saved. Some changes may require app restart.');
   } catch (error) {

@@ -210,6 +210,10 @@ pub struct AppSettings {
     // AI schema context: comma/newline separated name patterns to exclude from the schema
     // sent to the model (e.g. "backup, *_bak, pre_delete*") to reduce input tokens.
     pub ai_exclude_patterns: Option<String>,
+    // Directory containing the Oracle client (OCI) libraries, e.g. an Instant Client
+    // folder. Prepended to the process PATH at startup so Oracle connections can load
+    // the OCI runtime without a system-wide PATH entry. Requires the `oracle` feature.
+    pub oracle_lib_dir: Option<String>,
     // Query History Retention
     pub history_max_total: Option<u32>,
     pub history_max_per_connection: Option<u32>,
@@ -219,6 +223,32 @@ pub struct AppSettings {
     pub enable_history_retention_total: Option<bool>,
     pub enable_history_retention_per_connection: Option<bool>,
     pub enable_history_retention_lifetime: Option<bool>,
+}
+
+impl Default for AppSettings {
+    fn default() -> Self {
+        Self {
+            app_data_path: None,
+            schema_cache_ttl: None,
+            ai_mode: None,
+            ollama_url: None,
+            ollama_model: None,
+            cloud_provider: None,
+            cloud_api_key: None,
+            cloud_model: None,
+            cloud_base_url: None,
+            ai_exclude_patterns: None,
+            oracle_lib_dir: None,
+            history_max_total: Some(1000),
+            history_max_per_connection: Some(100),
+            history_max_lifetime_days: Some(30),
+            history_max_lifetime_hours: Some(0),
+            history_max_lifetime_minutes: Some(0),
+            enable_history_retention_total: Some(true),
+            enable_history_retention_per_connection: Some(false),
+            enable_history_retention_lifetime: Some(false),
+        }
+    }
 }
 
 /// Result of an AI SQL generation call, including token usage and timing for review.

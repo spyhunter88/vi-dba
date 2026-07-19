@@ -6,7 +6,7 @@ use crate::models::{
 };
 use async_trait::async_trait;
 use chrono::{DateTime, NaiveDateTime, Utc};
-use sqlx::{Column, PgPool, Row, TypeInfo};
+use sqlx::{Column, Executor, PgPool, Row, TypeInfo};
 use std::collections::HashMap;
 use std::time::Instant;
 
@@ -499,15 +499,31 @@ impl PostgreSqlDatabase {
             _ => Some(val.to_string().trim_matches('"').to_string()),
         }
     }
-}
 
-#[async_trait]
-impl Database for PostgreSqlDatabase {
-    /// Executes a SQL query. For SELECTs, it returns rows and metadata.
-    /// For other statements, it returns affected rows.
-    /// Handles schema context switching using SET search_path.
-    async fn execute_query(
+    /// Applies the effective search_path on the given connection. No-op when no schema
+    /// context can be resolved.
+    async fn switch_context(
         &self,
+        conn: &mut sqlx::PgConnection,
+        catalog: Option<String>,
+        schema: Option<String>,
+    ) -> Result<(), String> {
+        let effective_schema =
+            utils::get_effective_context(schema, catalog, self.default_schema.clone());
+        if let Some(sch) = effective_schema {
+            let set_path = format!("SET search_path TO \"{}\"", sch);
+            conn.execute(sqlx::raw_sql(&set_path))
+                .await
+                .map_err(|e| format!("Failed to switch schema context to `{}`: {}", sch, e))?;
+        }
+        Ok(())
+    }
+
+    /// Runs a single statement on an already-acquired connection. Shared by `execute_query`
+    /// and `execute_script`; context switching is handled by the caller.
+    async fn exec_stmt(
+        &self,
+        conn: &mut sqlx::PgConnection,
         query: &str,
         table_name: Option<String>,
         catalog: Option<String>,
@@ -515,25 +531,6 @@ impl Database for PostgreSqlDatabase {
     ) -> Result<QueryResult, String> {
         let start = Instant::now();
         let info = utils::parse_query(query, table_name);
-
-        let mut conn = self.pool.acquire().await.map_err(|e| e.to_string())?;
-
-        // Handle schema context switching for PostgreSQL
-        let effective_schema = utils::get_effective_context(
-            schema.clone(),
-            catalog.clone(),
-            self.default_schema.clone(),
-        );
-
-        if let Some(sch) = effective_schema {
-            if !info.q_trimmed.starts_with("SET SEARCH_PATH") {
-                let set_path = format!("SET search_path TO \"{}\"", sch);
-                sqlx::raw_sql(&set_path)
-                    .execute(&self.pool)
-                    .await
-                    .map_err(|e| format!("Failed to switch schema context to `{}`: {}", sch, e))?;
-            }
-        }
 
         let pks = if let Some(table) = &info.detected_table_name {
             self.get_primary_keys(table, catalog.clone(), schema.clone())
@@ -587,6 +584,67 @@ impl Database for PostgreSqlDatabase {
                 table_name: None,
             })
         }
+    }
+}
+
+#[async_trait]
+impl Database for PostgreSqlDatabase {
+    /// Executes a SQL query. For SELECTs, it returns rows and metadata.
+    /// For other statements, it returns affected rows.
+    /// Handles schema context switching using SET search_path.
+    async fn execute_query(
+        &self,
+        query: &str,
+        table_name: Option<String>,
+        catalog: Option<String>,
+        schema: Option<String>,
+    ) -> Result<QueryResult, String> {
+        let mut conn = self.pool.acquire().await.map_err(|e| e.to_string())?;
+
+        // Run the context switch on the SAME acquired connection that will execute the
+        // query. Executing it against `&self.pool` would grab a different pooled
+        // connection (this one is still borrowed), leaving the query connection without
+        // the intended search_path. Skip it when the query itself sets the search_path.
+        if !query.trim_start().to_uppercase().starts_with("SET SEARCH_PATH") {
+            self.switch_context(&mut conn, catalog.clone(), schema.clone())
+                .await?;
+        }
+
+        self.exec_stmt(&mut conn, query, table_name, catalog, schema)
+            .await
+    }
+
+    async fn execute_script(
+        &self,
+        statements: &[String],
+        table_name: Option<String>,
+        catalog: Option<String>,
+        schema: Option<String>,
+    ) -> Result<Vec<QueryResult>, String> {
+        if statements.is_empty() {
+            return Ok(vec![]);
+        }
+
+        // A single connection for the whole script keeps session state alive across
+        // statements: transactions (BEGIN/COMMIT), temporary tables, session GUCs.
+        let mut conn = self.pool.acquire().await.map_err(|e| e.to_string())?;
+        self.switch_context(&mut conn, catalog.clone(), schema.clone())
+            .await?;
+
+        let mut results = Vec::with_capacity(statements.len());
+        for stmt in statements {
+            let r = self
+                .exec_stmt(
+                    &mut conn,
+                    stmt,
+                    table_name.clone(),
+                    catalog.clone(),
+                    schema.clone(),
+                )
+                .await?;
+            results.push(r);
+        }
+        Ok(results)
     }
 
     /// Fetches a list of tables and their metadata (row count estimate, comments) in the schema.

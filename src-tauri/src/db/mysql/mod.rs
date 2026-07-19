@@ -12,7 +12,7 @@ pub use version::{MySqlVersion, MySqlVersionGroup};
 
 use async_trait::async_trait;
 use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
-use sqlx::{Column, MySqlPool, Row, TypeInfo};
+use sqlx::{Column, Executor, MySqlPool, Row, TypeInfo};
 use std::collections::HashMap;
 use std::time::Instant;
 
@@ -488,12 +488,32 @@ impl MySqlDatabase {
             _ => Some(val.to_string().trim_matches('"').to_string()),
         }
     }
-}
 
-#[async_trait]
-impl Database for MySqlDatabase {
-    async fn execute_query(
+    /// Switches the active database on the given connection to the effective catalog/schema.
+    /// No-op when no context can be resolved.
+    async fn switch_context(
         &self,
+        conn: &mut sqlx::MySqlConnection,
+        catalog: Option<String>,
+        schema: Option<String>,
+    ) -> Result<(), String> {
+        let effective_catalog =
+            utils::get_effective_context(catalog, schema, self.default_database.clone());
+        if let Some(cat) = effective_catalog {
+            let use_query = format!("USE `{}`;", cat);
+            conn.execute(sqlx::raw_sql(&use_query))
+                .await
+                .map_err(|e| format!("Failed to switch database context to `{}`: {}", cat, e))?;
+        }
+        Ok(())
+    }
+
+    /// Runs a single statement on an already-acquired connection. Shared by `execute_query`
+    /// (one statement per pooled connection) and `execute_script` (many statements on one
+    /// connection). Context switching is handled by the caller.
+    async fn exec_stmt(
+        &self,
+        conn: &mut sqlx::MySqlConnection,
         query: &str,
         table_name: Option<String>,
         catalog: Option<String>,
@@ -501,24 +521,6 @@ impl Database for MySqlDatabase {
     ) -> Result<QueryResult, String> {
         let start = Instant::now();
         let info = utils::parse_query(query, table_name);
-        let mut conn = self.pool.acquire().await.map_err(|e| e.to_string())?;
-        let effective_catalog = utils::get_effective_context(
-            catalog.clone(),
-            schema.clone(),
-            self.default_database.clone(),
-        );
-
-        if let Some(cat) = effective_catalog {
-            if !info.q_trimmed.starts_with("USE ") {
-                let use_query = format!("USE `{}`;", cat);
-                sqlx::raw_sql(&use_query)
-                    .execute(&self.pool)
-                    .await
-                    .map_err(|e| {
-                        format!("Failed to switch database context to `{}`: {}", cat, e)
-                    })?;
-            }
-        }
 
         let pks = if let Some(table) = &info.detected_table_name {
             self.get_primary_keys(table, catalog.clone(), schema.clone())
@@ -574,6 +576,64 @@ impl Database for MySqlDatabase {
                 table_name: None,
             })
         }
+    }
+}
+
+#[async_trait]
+impl Database for MySqlDatabase {
+    async fn execute_query(
+        &self,
+        query: &str,
+        table_name: Option<String>,
+        catalog: Option<String>,
+        schema: Option<String>,
+    ) -> Result<QueryResult, String> {
+        let mut conn = self.pool.acquire().await.map_err(|e| e.to_string())?;
+
+        // Run the context switch on the SAME acquired connection that will execute the
+        // query. Executing it against `&self.pool` would grab a different pooled
+        // connection (this one is still borrowed), leaving the query connection without
+        // a database context. Skip it when the query itself is a `USE`.
+        if !query.trim_start().to_uppercase().starts_with("USE ") {
+            self.switch_context(&mut conn, catalog.clone(), schema.clone())
+                .await?;
+        }
+
+        self.exec_stmt(&mut conn, query, table_name, catalog, schema)
+            .await
+    }
+
+    async fn execute_script(
+        &self,
+        statements: &[String],
+        table_name: Option<String>,
+        catalog: Option<String>,
+        schema: Option<String>,
+    ) -> Result<Vec<QueryResult>, String> {
+        if statements.is_empty() {
+            return Ok(vec![]);
+        }
+
+        // A single connection for the whole script keeps session state alive across
+        // statements: transactions (BEGIN/COMMIT), temporary tables, session variables.
+        let mut conn = self.pool.acquire().await.map_err(|e| e.to_string())?;
+        self.switch_context(&mut conn, catalog.clone(), schema.clone())
+            .await?;
+
+        let mut results = Vec::with_capacity(statements.len());
+        for stmt in statements {
+            let r = self
+                .exec_stmt(
+                    &mut conn,
+                    stmt,
+                    table_name.clone(),
+                    catalog.clone(),
+                    schema.clone(),
+                )
+                .await?;
+            results.push(r);
+        }
+        Ok(results)
     }
 
     async fn get_table_list(

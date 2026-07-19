@@ -16,7 +16,6 @@ import SnapshotManager from '../ui/SnapshotManager.vue';
 import QueryHistoryManager from '../ui/QueryHistoryManager.vue';
 import SqlHelpManager from '../ui/SqlHelpManager.vue';
 import { registerSqlCompletionProvider } from '../../utils/sqlCompletion';
-import { parseAndLintSql } from '../../utils/sqlLinter';
 import { registerGlobalFormattingProvider } from '../../utils/sqlFormatter';
 import ContextMenu from '../ui/ContextMenu.vue';
 
@@ -101,7 +100,6 @@ onMounted(() => {
       if (currentTab.value && value !== props.modelValue) {
         currentTab.value.isDirty = true;
       }
-      triggerLinter();
     });
 
     // Add action for Ctrl+R to execute all
@@ -147,9 +145,7 @@ onMounted(() => {
       }
     });
 
-    loadSchema().then(() => {
-      runLinter();
-    });
+    loadSchema();
     registerAutocomplete();
 
     // Listen for paste event from history popup
@@ -186,7 +182,6 @@ onMounted(() => {
     onBeforeUnmount(() => {
       window.removeEventListener('vi-paste-query', pasteListener);
       if (unlistenRequest) unlistenRequest();
-      clearTimeout(lintTimeout);
     });
 
     // Custom context menu handler
@@ -203,6 +198,12 @@ async function handleContextMenu(e: MouseEvent) {
   const items = [];
 
   if (hasSelection) {
+    items.push({
+      label: 'Execute Selection',
+      icon: Play,
+      shortcut: 'Ctrl+Shift+R',
+      action: () => handleExecute('selection')
+    });
     items.push({
       label: 'Cut',
       icon: Scissors,
@@ -221,13 +222,14 @@ async function handleContextMenu(e: MouseEvent) {
         document.execCommand('copy');
       }
     });
-    items.push({
-      label: 'Execute Selection',
-      icon: Play,
-      shortcut: 'Ctrl+Shift+R',
-      action: () => handleExecute('selection')
-    });
   } else {
+    items.push({
+      label: 'Execute',
+      icon: Play,
+      shortcut: 'F5',
+      action: () => handleExecute('auto')
+    });
+
     let clipboardText = '';
     let isClipboardEmpty = true;
     try {
@@ -274,24 +276,6 @@ async function handleContextMenu(e: MouseEvent) {
   };
 }
 
-let lintTimeout: any = null;
-function runLinter() {
-  if (!editor) return;
-  const model = editor.getModel();
-  if (!model) return;
-  const markers = parseAndLintSql(model, cachedSchema.value);
-  monaco.editor.setModelMarkers(model, 'sql-linter', markers);
-}
-
-function triggerLinter() {
-  clearTimeout(lintTimeout);
-  lintTimeout = setTimeout(runLinter, 500);
-}
-
-watch(() => cachedSchema.value, () => {
-  runLinter();
-}, { deep: true });
-
 function handleFormat() {
   if (!editor) return;
   editor.trigger('format', 'editor.action.formatDocument', null);
@@ -299,8 +283,21 @@ function handleFormat() {
 
 async function loadSchema() {
   if (!currentTab.value?.connectionId) return;
+  const connId = currentTab.value.connectionId;
   try {
-    const schemaJson = await invoke<string | null>('get_schema_cache', { id: currentTab.value.connectionId });
+    let schemaJson = await invoke<string | null>('get_schema_cache', { id: connId });
+    // Cache miss (never synced or TTL-expired). The cache is only populated on an
+    // explicit refresh, so a freshly-opened connection has no schema for autocomplete.
+    // Populate it on demand here so table/column suggestions work out of the box.
+    if (!schemaJson) {
+      try {
+        await invoke('refresh_schema_cache', { id: connId });
+        schemaJson = await invoke<string | null>('get_schema_cache', { id: connId });
+      } catch (refreshErr) {
+        // Connection may be disconnected — leave suggestions to keywords only.
+        console.warn('Failed to populate schema cache for autocomplete:', refreshErr);
+      }
+    }
     if (schemaJson) {
       cachedSchema.value = JSON.parse(schemaJson);
     }
@@ -467,6 +464,22 @@ function restoreSnapshot(content: string) {
     editor.setValue(content);
   }
 }
+
+// Inserts text at the current cursor position (replacing any active selection).
+// Exposed so parent editors (e.g. AI SQL) can splice generated SQL in-place
+// instead of overwriting the whole document.
+function insertAtCursor(text: string) {
+  if (!editor) return;
+  const selection = editor.getSelection();
+  if (selection) {
+    editor.executeEdits('ai-insert', [
+      { range: selection, text, forceMoveMarkers: true }
+    ]);
+    editor.focus();
+  }
+}
+
+defineExpose({ insertAtCursor });
 </script>
 
 <template>

@@ -3,3 +3,7 @@
 /dist
 .DS_Store
 /.claude
+
+# AI Agent
+AGENTS.md
+CLAUDE.md

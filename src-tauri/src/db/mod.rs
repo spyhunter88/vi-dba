@@ -8,7 +8,26 @@ use crate::models::{QueryResult, DbObject, TableDefinition, RoutineDefinition, V
 pub trait Database: Send + Sync {
     /// Executes a SQL query and returns the result, including column metadata and rows.
     async fn execute_query(&self, query: &str, table_name: Option<String>, catalog: Option<String>, schema: Option<String>) -> Result<QueryResult, String>;
-    
+
+    /// Executes a sequence of statements as one script, returning one result per statement.
+    ///
+    /// Drivers backed by a connection pool MUST run every statement on the SAME physical
+    /// connection so that session-scoped state — open transactions (`BEGIN`/`COMMIT`),
+    /// temporary tables, session variables — survives across statements. The default
+    /// implementation runs each statement via `execute_query`, which is only correct for
+    /// drivers that already share a single connection (e.g. SQL Server, MongoDB, Oracle);
+    /// pooled drivers override this.
+    ///
+    /// Execution stops at the first failing statement and returns its error.
+    async fn execute_script(&self, statements: &[String], table_name: Option<String>, catalog: Option<String>, schema: Option<String>) -> Result<Vec<QueryResult>, String> {
+        let mut results = Vec::with_capacity(statements.len());
+        for stmt in statements {
+            let r = self.execute_query(stmt, table_name.clone(), catalog.clone(), schema.clone()).await?;
+            results.push(r);
+        }
+        Ok(results)
+    }
+
     /// Returns a list of all tables for the specified catalog/schema.
     async fn get_table_list(&self, catalog: Option<String>, schema: Option<String>) -> Result<QueryResult, String>;
     

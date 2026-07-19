@@ -9,13 +9,17 @@ import {
   FileText as FileTextIcon,
   Globe,
   Calendar,
-  Loader2
+  Loader2,
+  ClipboardCopy,
+  Pencil,
+  Ban
 } from 'lucide-vue-next';
 import * as monaco from 'monaco-editor';
 import { useTabStore } from '../../stores/tabs';
 import { useQueryStore } from '../../stores/query';
 import { useUiStore } from '../../stores/ui';
 import type { QueryResult } from '../../types';
+import ContextMenu from '../ui/ContextMenu.vue';
 
 const props = defineProps<{
   tabId: string;
@@ -30,6 +34,13 @@ const uiStore = useUiStore();
 const editingCell = ref<{ rowIndex: number; colName: string; value: any; initialValue: any; isPending?: boolean } | null>(null);
 const selectedCell = ref<{ rowIndex: number; colName: string; value: any } | null>(null);
 const pendingRows = ref<any[]>([]);
+
+const contextMenu = ref({
+  show: false,
+  x: 0,
+  y: 0,
+  items: [] as any[]
+});
 
 const detailMode = ref<'text' | 'json' | 'html'>('text');
 const monacoContainer = ref<HTMLElement | null>(null);
@@ -219,6 +230,60 @@ function selectCell(rowIndex: number, colName: string, value: any) {
   selectedCell.value = { rowIndex, colName, value };
 }
 
+// Copies the cell's displayed content to the clipboard (NULL → empty string).
+async function copyCellContent(value: any) {
+  const text = value === null || value === undefined
+    ? ''
+    : (typeof value === 'object' ? JSON.stringify(value) : String(value));
+  try {
+    await navigator.clipboard.writeText(text);
+    uiStore.showToast('Cell content copied');
+  } catch (e) {
+    console.error('Failed to copy cell content:', e);
+    uiStore.showToast('Failed to copy cell content', 'error');
+  }
+}
+
+function handleCellContextMenu(e: MouseEvent, rowIndex: number, colName: string, value: any) {
+  e.preventDefault();
+  // Right-clicking selects the cell so the actions target it.
+  selectCell(rowIndex, colName, value);
+
+  const items: any[] = [];
+
+  items.push({
+    label: 'Copy cell content',
+    icon: ClipboardCopy,
+    action: () => copyCellContent(value)
+  });
+
+  const isEditingThisCell = !!editingCell.value
+    && !editingCell.value.isPending
+    && editingCell.value.rowIndex === rowIndex
+    && editingCell.value.colName === colName;
+
+  if (isEditingThisCell) {
+    items.push({
+      label: 'Cancel edit',
+      icon: Ban,
+      action: () => stopEditing()
+    });
+  } else if (isEditable.value) {
+    items.push({
+      label: 'Edit',
+      icon: Pencil,
+      action: () => startEditing(rowIndex, colName, value)
+    });
+  }
+
+  contextMenu.value = {
+    show: true,
+    x: e.clientX,
+    y: e.clientY,
+    items
+  };
+}
+
 function formatCellValue(value: any, colName: string) {
   if (value === null || value === undefined) return 'NULL';
   
@@ -378,9 +443,85 @@ watch(() => tab.value?.showDetail, async (shown) => {
   }
 });
 
+// Scrolls the selected cell fully into view on both axes. Because the grid is
+// virtualized, we first bring the target row roughly into range (by row math) so it
+// gets rendered, then fine-tune against the real cell element for pixel accuracy —
+// offsetting for the sticky header (top) and sticky action column (left) so the cell
+// never ends up hidden underneath them.
+async function scrollSelectedCellIntoView(rowIndex: number) {
+  const container = scrollContainer.value;
+  if (!container) return;
+
+  const rowTop = rowIndex * ROW_HEIGHT;
+  const rowBottom = rowTop + ROW_HEIGHT;
+  if (rowTop < container.scrollTop) {
+    container.scrollTop = rowTop;
+  } else if (rowBottom > container.scrollTop + container.clientHeight) {
+    container.scrollTop = rowBottom - container.clientHeight;
+  }
+
+  await nextTick();
+
+  const cell = container.querySelector('td.selected') as HTMLElement | null;
+  if (!cell) return;
+
+  const cRect = container.getBoundingClientRect();
+  const cellRect = cell.getBoundingClientRect();
+  const headHeight = (container.querySelector('thead') as HTMLElement | null)?.offsetHeight ?? 0;
+  const stickyLeft = (container.querySelector('.action-col.sticky') as HTMLElement | null)?.offsetWidth ?? 0;
+
+  // Visible region, excluding the sticky overlays and scrollbars.
+  const viewTop = cRect.top + headHeight;
+  const viewBottom = cRect.top + container.clientHeight;
+  const viewLeft = cRect.left + stickyLeft;
+  const viewRight = cRect.left + container.clientWidth;
+
+  if (cellRect.top < viewTop) container.scrollTop += cellRect.top - viewTop;
+  else if (cellRect.bottom > viewBottom) container.scrollTop += cellRect.bottom - viewBottom;
+
+  if (cellRect.left < viewLeft) container.scrollLeft += cellRect.left - viewLeft;
+  else if (cellRect.right > viewRight) container.scrollLeft += cellRect.right - viewRight;
+}
+
 async function handleKeydown(e: KeyboardEvent) {
+  // Only the grid in the active tab responds to global key events.
+  if (tabStore.activeTabId !== props.tabId) return;
+
   // If we are editing, let the input handle keys
   if (editingCell.value) return;
+
+  const ARROW_KEYS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+
+  if (ARROW_KEYS.includes(e.key) && selectedCell.value) {
+    // Don't hijack arrow keys while the user is typing in a text field or the
+    // SQL editor (the grid shares a tab with the Monaco editor in query tabs).
+    const active = document.activeElement as HTMLElement | null;
+    const tag = active?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || active?.isContentEditable) {
+      return;
+    }
+    e.preventDefault();
+    const cols = displayColumns.value;
+    const colIdx = cols.indexOf(selectedCell.value.colName);
+    if (colIdx === -1) return;
+
+    let r = selectedCell.value.rowIndex;
+    let c = colIdx;
+    const lastRow = displayRows.value.length - 1;
+
+    if (e.key === 'ArrowUp') r = Math.max(0, r - 1);
+    else if (e.key === 'ArrowDown') r = Math.min(lastRow, r + 1);
+    else if (e.key === 'ArrowLeft') c = Math.max(0, c - 1);
+    else if (e.key === 'ArrowRight') c = Math.min(cols.length - 1, c + 1);
+
+    const newCol = cols[c];
+    const newRow = displayRows.value[r];
+    if (newRow && newCol) {
+      selectCell(r, newCol, newRow[newCol]);
+      scrollSelectedCellIntoView(r);
+    }
+    return;
+  }
 
   if (e.key === 'Delete' && selectedCell.value) {
     const { rowIndex, colName } = selectedCell.value;
@@ -496,6 +637,7 @@ defineExpose({
               }"
               @click="selectCell(absRowIndex(idx), col, row[col])"
               @dblclick="startEditing(absRowIndex(idx), col, row[col])"
+              @contextmenu="handleCellContextMenu($event, absRowIndex(idx), col, row[col])"
             >
               <div class="cell-wrapper">
                 <div v-if="editingCell && !editingCell.isPending && editingCell.rowIndex === absRowIndex(idx) && editingCell.colName === col" class="cell-editor-with-picker">
@@ -517,8 +659,8 @@ defineExpose({
                     :type="getCellInputType(col)"
                     class="cell-input"
                     @blur="saveCell"
-                    @keyup.enter="saveCell"
-                    @keyup.esc="stopEditing"
+                    @keydown.enter.prevent="saveCell"
+                    @keydown.esc="stopEditing"
                     v-focus
                   />
                 </div>
@@ -569,8 +711,8 @@ defineExpose({
                       :type="getCellInputType(col)"
                       class="cell-input"
                       @blur="saveCell"
-                      @keyup.enter="saveCell"
-                      @keyup.esc="stopEditing"
+                      @keydown.enter.prevent="saveCell"
+                      @keydown.esc="stopEditing"
                       v-focus
                     />
                   </div>
@@ -672,13 +814,21 @@ defineExpose({
           ref="monacoContainer"
           class="monaco-detail-wrapper"
         ></div>
-        <div 
+        <div
           v-if="detailMode === 'html'"
           class="html-detail-view"
           v-html="selectedCell ? String(selectedCell.value) : ''"
         ></div>
       </div>
     </div>
+
+    <ContextMenu
+      :show="contextMenu.show"
+      :x="contextMenu.x"
+      :y="contextMenu.y"
+      :items="contextMenu.items"
+      @close="contextMenu.show = false"
+    />
   </div>
 </template>
 
@@ -864,7 +1014,10 @@ defineExpose({
   justify-content: space-between;
   padding: 2px 8px;
   min-width: 50px;
-  max-width: 550px;
+  /* Cap column width so a single long value truncates (with ellipsis) instead of
+     stretching the whole column. Full content is still available via the Text
+     detail pane and the "Copy cell content" action. */
+  max-width: 280px;
   gap: 8px;
   min-height: 22px;
 }

@@ -39,6 +39,39 @@ const availableModels = ref<string[]>([]);
 const selectedModel = ref('');
 const lastStats = ref<AiSqlResult | null>(null);
 
+// When the editor already has content, generated SQL is held here for the user to
+// review and apply, instead of silently overwriting their work.
+const sqlEditorRef = ref<InstanceType<typeof SqlEditor> | null>(null);
+const pendingSql = ref<string | null>(null);
+
+function buildBlock(sql: string): string {
+  const timestamp = new Date().toLocaleTimeString();
+  return `-- AI Generated at ${timestamp}:\n${sql}`;
+}
+
+function acceptReplace() {
+  if (!tab.value || pendingSql.value == null) return;
+  tab.value.content = buildBlock(pendingSql.value);
+  pendingSql.value = null;
+}
+
+function acceptAppend() {
+  if (!tab.value || pendingSql.value == null) return;
+  const existing = (tab.value.content || '').replace(/\s*$/, '');
+  tab.value.content = existing ? `${existing}\n\n${buildBlock(pendingSql.value)}` : buildBlock(pendingSql.value);
+  pendingSql.value = null;
+}
+
+function acceptInsert() {
+  if (pendingSql.value == null) return;
+  sqlEditorRef.value?.insertAtCursor(pendingSql.value);
+  pendingSql.value = null;
+}
+
+function discardPending() {
+  pendingSql.value = null;
+}
+
 // Live elapsed-time ticker shown while a generation is in flight.
 const elapsedMs = ref(0);
 let timerId: ReturnType<typeof setInterval> | null = null;
@@ -82,18 +115,22 @@ async function handleAiPrompt(promptText: string) {
        schema: tab.value.schema
     });
 
-    // Directly apply to editor
-    const timestamp = new Date().toLocaleTimeString();
-    const comment = `-- AI Generated at ${timestamp}:\n`;
-    tab.value.content = comment + res.sql;
-
     lastStats.value = res;
     promptHistory.value.unshift(promptText);
     if (promptHistory.value.length > 20) promptHistory.value.pop();
 
+    // Apply directly only when there's nothing to lose; otherwise let the user
+    // decide how to merge the generated SQL with their existing work.
+    const hasExistingContent = !!tab.value.content && !!tab.value.content.trim();
+    if (hasExistingContent) {
+      pendingSql.value = res.sql;
+    } else {
+      tab.value.content = buildBlock(res.sql);
+    }
+
     queryStore.addTabMessage(
       props.tabId,
-      `SQL generated and applied. ${res.tokensIn} tokens in / ${res.tokensOut} out · ${(res.timeMs / 1000).toFixed(2)}s · ${res.tableCount} tables (${res.model}).`
+      `SQL generated${hasExistingContent ? ' — review and apply below' : ' and applied'}. ${res.tokensIn} tokens in / ${res.tokensOut} out · ${(res.timeMs / 1000).toFixed(2)}s · ${res.tableCount} tables (${res.model}).`
     );
     aiPrompt.value = '';
   } catch (e: any) {
@@ -184,12 +221,25 @@ onBeforeUnmount(() => {
         @cancel="handleCancel"
       />
 
+      <!-- Pending generated SQL: review before touching the user's existing content -->
+      <div v-if="pendingSql !== null" class="pending-result mt-3">
+        <div class="pending-header">
+          <span>Generated SQL — apply to editor?</span>
+          <div class="pending-actions">
+            <button class="btn-apply" @click="acceptReplace">Replace</button>
+            <button class="btn-apply" @click="acceptInsert">Insert at cursor</button>
+            <button class="btn-apply" @click="acceptAppend">Append</button>
+            <button class="btn-discard" @click="discardPending">Discard</button>
+          </div>
+        </div>
+        <pre class="pending-preview">{{ pendingSql }}</pre>
+      </div>
     </div>
 
     <!-- Main Editor & Result Area -->
     <div class="editor-workspace flex-1 flex flex-col min-h-0">
       <div class="editor-section" :style="{ height: splitPercent + '%' }">
-        <SqlEditor v-model="tab.content" :tab-id="tabId" />
+        <SqlEditor ref="sqlEditorRef" v-model="tab.content" :tab-id="tabId" />
       </div>
       
       <div class="splitter" @mousedown="startResizing">
@@ -222,6 +272,68 @@ onBeforeUnmount(() => {
   font-family: 'JetBrains Mono', monospace;
   color: var(--text-primary);
   max-height: 150px;
+}
+
+.mt-3 { margin-top: 12px; }
+
+.pending-result {
+  border: 1px solid var(--accent-primary);
+  border-radius: 6px;
+  background: rgba(var(--accent-rgb), 0.06);
+  overflow: hidden;
+}
+
+.pending-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.pending-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.pending-actions button {
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  border: 1px solid var(--border-color);
+}
+
+.btn-apply {
+  background: var(--accent-primary);
+  color: #fff;
+  border-color: var(--accent-primary);
+}
+
+.btn-apply:hover { opacity: 0.9; }
+
+.btn-discard {
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.btn-discard:hover { color: var(--text-primary); }
+
+.pending-preview {
+  margin: 0;
+  padding: 10px 12px;
+  max-height: 160px;
+  overflow: auto;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--text-primary);
+  white-space: pre;
 }
 
 .editor-workspace {

@@ -24,9 +24,15 @@ pub struct TabState {
     pub title: String,
     pub tab_type: String, // TabType as string
     pub connection_id: String,
+    #[serde(default)]
+    pub database: Option<String>,
+    #[serde(default)]
+    pub schema: Option<String>,
     pub content: Option<String>,
     pub file_path: Option<String>,
     pub metadata: Option<serde_json::Value>,
+    #[serde(default)]
+    pub pagination: Option<serde_json::Value>,
     pub cursor_position: Option<serde_json::Value>,
 }
 

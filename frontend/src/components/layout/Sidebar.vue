@@ -698,7 +698,7 @@ async function handleViewLastPage() {
       <div class="brand flex-center gap-2">
         <img src="/app-icon.png" alt="Vi" class="sidebar-logo" />
         <span class="font-bold">ViDBA</span>
-        <span class="version-text">v0.5.0</span>
+        <span class="version-text">v0.5.2</span>
       </div>
     </div>
 

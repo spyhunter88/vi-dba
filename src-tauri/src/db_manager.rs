@@ -694,6 +694,36 @@ impl DbManager {
         result
     }
 
+    /// Executes a multi-statement script. All statements run on a single connection so that
+    /// session state (transactions, temporary tables, session variables) is preserved across
+    /// them. Returns one `QueryResult` per statement. Supports cancellation via `exec_id`.
+    pub async fn execute_script(&self, id: &str, statements: Vec<String>, table_name: Option<String>, catalog: Option<String>, schema: Option<String>, exec_id: Option<String>) -> Result<Vec<QueryResult>, String> {
+        let db = {
+            let pools = self.pools.lock().await;
+            pools.get(id).ok_or("Not connected")?.clone()
+        };
+
+        let task = tokio::spawn(async move {
+            db.execute_script(&statements, table_name, catalog, schema).await
+        });
+
+        if let Some(key) = exec_id.clone() {
+            self.active_queries.lock().await.insert(key, task.abort_handle());
+        }
+
+        let result = match task.await {
+            Ok(res) => res,
+            Err(e) if e.is_cancelled() => Err("Query cancelled by user".to_string()),
+            Err(e) => Err(format!("Task error: {}", e)),
+        };
+
+        if let Some(key) = exec_id {
+            self.active_queries.lock().await.remove(&key);
+        }
+
+        result
+    }
+
     pub async fn cancel_query(&self, exec_id: &str) -> bool {
         if let Some(handle) = self.active_queries.lock().await.remove(exec_id) {
             handle.abort();

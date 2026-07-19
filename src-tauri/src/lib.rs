@@ -20,6 +20,19 @@ pub fn run() {
             let settings_manager = SettingsManager::new(app_handle);
 
             app.manage(settings_manager);
+
+            // If the user configured a custom Oracle client directory, make its OCI
+            // libraries discoverable by prepending it to the process PATH before any
+            // Oracle connection (and thus any OCI load) can happen.
+            if let Some(dir) = app.state::<SettingsManager>().load_settings().oracle_lib_dir {
+                let dir = dir.trim();
+                if !dir.is_empty() {
+                    let sep = if cfg!(windows) { ";" } else { ":" };
+                    let current = std::env::var("PATH").unwrap_or_default();
+                    std::env::set_var("PATH", format!("{}{}{}", dir, sep, current));
+                }
+            }
+
             app.manage(DbManager::new());
             app.manage(config_manager::ConfigManager::new());
             app.manage(script_manager::ScriptManager::new());
@@ -53,6 +66,7 @@ pub fn run() {
             commands::connect,
             commands::disconnect,
             commands::execute_query,
+            commands::execute_script,
             commands::cancel_query,
             commands::get_objects,
             commands::test_connection,

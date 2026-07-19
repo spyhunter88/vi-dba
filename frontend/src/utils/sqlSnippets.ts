@@ -13,10 +13,10 @@ export const SNIPPETS: Snippet[] = [
   {
     id: 'dt_cast_date',
     name: 'Timestamp to Date',
-    description: 'Trích xuất phần ngày (YYYY-MM-DD) từ giá trị timestamp/datetime.',
+    description: 'Extract the date part (YYYY-MM-DD) from a timestamp/datetime value.',
     category: 'datetime',
     dialects: {
-      postgreSQL: { code: 'CAST(${1:column} AS DATE)', example: 'CAST(created_at AS DATE) -- hoặc created_at::date' },
+      postgreSQL: { code: 'CAST(${1:column} AS DATE)', example: 'CAST(created_at AS DATE) -- or created_at::date' },
       mySQL: { code: 'DATE(${1:column})', example: 'DATE(created_at)' },
       sqlite: { code: 'DATE(${1:column})', example: 'DATE(created_at)' },
       sqlServer: { code: 'CAST(${1:column} AS DATE)', example: 'CAST(created_at AS DATE)' },
@@ -27,7 +27,7 @@ export const SNIPPETS: Snippet[] = [
   {
     id: 'dt_format_str',
     name: 'Format Timestamp to String',
-    description: 'Chuyển đổi timestamp thành chuỗi ký tự theo định dạng tùy chỉnh.',
+    description: 'Convert a timestamp into a string using a custom format.',
     category: 'datetime',
     dialects: {
       postgreSQL: { code: "TO_CHAR(${1:column}, '${2:YYYY-MM-DD HH24:MI:SS}')", example: "TO_CHAR(created_at, 'YYYY-MM-DD HH24:MI:SS')" },
@@ -41,11 +41,11 @@ export const SNIPPETS: Snippet[] = [
   {
     id: 'dt_epoch_to_ts',
     name: 'Unix Epoch to Timestamp',
-    description: 'Đổi số giây/mili giây Unix Epoch thành kiểu DateTime/Timestamp.',
+    description: 'Convert a Unix Epoch value (seconds/milliseconds) into a DateTime/Timestamp.',
     category: 'datetime',
     dialects: {
-      postgreSQL: { code: 'TO_TIMESTAMP(${1:epoch_seconds_col})', example: 'TO_TIMESTAMP(created_at_sec) -- hoặc TO_TIMESTAMP(created_at_ms / 1000.0)' },
-      mySQL: { code: 'FROM_UNIXTIME(${1:epoch_seconds_col})', example: 'FROM_UNIXTIME(created_at_sec) -- hoặc FROM_UNIXTIME(created_at_ms / 1000)' },
+      postgreSQL: { code: 'TO_TIMESTAMP(${1:epoch_seconds_col})', example: 'TO_TIMESTAMP(created_at_sec) -- or TO_TIMESTAMP(created_at_ms / 1000.0)' },
+      mySQL: { code: 'FROM_UNIXTIME(${1:epoch_seconds_col})', example: 'FROM_UNIXTIME(created_at_sec) -- or FROM_UNIXTIME(created_at_ms / 1000)' },
       sqlite: { code: "DATETIME(${1:epoch_seconds_col}, 'unixepoch')", example: "DATETIME(created_at, 'unixepoch')" },
       sqlServer: { code: "DATEADD(second, ${1:epoch_seconds_col}, '1970-01-01')", example: "DATEADD(second, created_at, '1970-01-01')" },
       oracle: { code: "TO_TIMESTAMP('1970-01-01 00:00:00','YYYY-MM-DD HH24:MI:SS') + NUMTODSINTERVAL(${1:epoch_seconds_col}, 'SECOND')", example: "TO_TIMESTAMP('1970-01-01 00:00:00','YYYY-MM-DD HH24:MI:SS') + NUMTODSINTERVAL(created_at, 'SECOND')" },
@@ -55,7 +55,7 @@ export const SNIPPETS: Snippet[] = [
   {
     id: 'dt_ts_to_epoch',
     name: 'Timestamp to Unix Epoch',
-    description: 'Chuyển đổi kiểu DateTime/Timestamp sang số nguyên Unix Epoch (giây).',
+    description: 'Convert a DateTime/Timestamp into a Unix Epoch integer (seconds).',
     category: 'datetime',
     dialects: {
       postgreSQL: { code: 'EXTRACT(EPOCH FROM ${1:column})', example: 'EXTRACT(EPOCH FROM created_at)' },
@@ -69,21 +69,21 @@ export const SNIPPETS: Snippet[] = [
   {
     id: 'dt_current',
     name: 'Get Current Date & Time',
-    description: 'Lấy thời gian hiện tại của hệ thống database.',
+    description: 'Get the current date and time from the database server.',
     category: 'datetime',
     dialects: {
-      postgreSQL: { code: 'CURRENT_TIMESTAMP', example: 'CURRENT_TIMESTAMP -- hoặc NOW()' },
+      postgreSQL: { code: 'CURRENT_TIMESTAMP', example: 'CURRENT_TIMESTAMP -- or NOW()' },
       mySQL: { code: 'NOW()', example: 'NOW()' },
-      sqlite: { code: "DATETIME('now')", example: "DATETIME('now') -- hoặc CURRENT_TIMESTAMP" },
-      sqlServer: { code: 'GETDATE()', example: 'GETDATE() -- hoặc CURRENT_TIMESTAMP' },
-      oracle: { code: 'CURRENT_TIMESTAMP', example: 'CURRENT_TIMESTAMP -- hoặc SYSDATE' },
+      sqlite: { code: "DATETIME('now')", example: "DATETIME('now') -- or CURRENT_TIMESTAMP" },
+      sqlServer: { code: 'GETDATE()', example: 'GETDATE() -- or CURRENT_TIMESTAMP' },
+      oracle: { code: 'CURRENT_TIMESTAMP', example: 'CURRENT_TIMESTAMP -- or SYSDATE' },
       mongoDB: { code: '$$NOW', example: '$$NOW' }
     }
   },
   {
     id: 'dt_add_interval',
     name: 'Add Interval to DateTime',
-    description: 'Cộng một khoảng thời gian (ngày, giờ, phút) vào timestamp.',
+    description: 'Add an interval (days, hours, minutes) to a timestamp.',
     category: 'datetime',
     dialects: {
       postgreSQL: { code: "${1:column} + INTERVAL '${2:7 days}'", example: "created_at + INTERVAL '7 days'" },
@@ -97,12 +97,12 @@ export const SNIPPETS: Snippet[] = [
   {
     id: 'tz_convert',
     name: 'Convert Timezone',
-    description: 'Chuyển đổi múi giờ của giá trị timestamp sang múi giờ mong muốn.',
+    description: 'Convert a timestamp value from one timezone to another.',
     category: 'timezone',
     dialects: {
       postgreSQL: { code: "${1:column} AT TIME ZONE '${2:UTC}' AT TIME ZONE '${3:Asia/Ho_Chi_Minh}'", example: "created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Ho_Chi_Minh'" },
       mySQL: { code: "CONVERT_TZ(${1:column}, '${2:UTC}', '${3:Asia/Ho_Chi_Minh}')", example: "CONVERT_TZ(created_at, 'UTC', 'Asia/Ho_Chi_Minh')" },
-      sqlite: { code: "DATETIME(${1:column}, 'localtime') -- Chỉ đổi từ UTC sang múi giờ máy khách local", example: "DATETIME(created_at, 'localtime')" },
+      sqlite: { code: "DATETIME(${1:column}, 'localtime') -- Only converts from UTC to the local client timezone", example: "DATETIME(created_at, 'localtime')" },
       sqlServer: { code: "${1:column} AT TIME ZONE '${2:UTC}' AT TIME ZONE '${3:SE Asia Standard Time}'", example: "created_at AT TIME ZONE 'UTC' AT TIME ZONE 'SE Asia Standard Time'" },
       oracle: { code: "FROM_TZ(CAST(${1:column} AS TIMESTAMP), '${2:UTC}') AT TIME ZONE '${3:Asia/Ho_Chi_Minh}'", example: "FROM_TZ(CAST(created_at AS TIMESTAMP), 'UTC') AT TIME ZONE 'Asia/Ho_Chi_Minh'" },
       mongoDB: { code: '{\n  $dateToString: {\n    format: "%Y-%m-%d %H:%M:%S",\n    date: "$${1:column}",\n    timezone: "${3:Asia/Ho_Chi_Minh}"\n  }\n}', example: '{\n  $dateToString: {\n    format: "%Y-%m-%d %H:%M:%S",\n    date: "$createdAt",\n    timezone: "Asia/Ho_Chi_Minh"\n  }\n}' }
@@ -111,7 +111,7 @@ export const SNIPPETS: Snippet[] = [
   {
     id: 'json_extract',
     name: 'Extract JSON Value',
-    description: 'Trích xuất giá trị từ khóa hoặc đường dẫn của cột JSON.',
+    description: 'Extract a value from a key or path within a JSON column.',
     category: 'json',
     dialects: {
       postgreSQL: { code: "${1:column}->>'${2:key}'", example: "attributes->>'user_id'" },
@@ -125,13 +125,13 @@ export const SNIPPETS: Snippet[] = [
   {
     id: 'cond_coalesce',
     name: 'Coalesce (Handle Null)',
-    description: 'Trả về giá trị mặc định đầu tiên nếu cột bị NULL.',
+    description: 'Return the first non-NULL value, falling back to a default when the column is NULL.',
     category: 'conditionals',
     dialects: {
       postgreSQL: { code: 'COALESCE(${1:column}, ${2:default_value})', example: 'COALESCE(status, \'unknown\')' },
-      mySQL: { code: 'IFNULL(${1:column}, ${2:default_value})', example: 'IFNULL(status, \'unknown\') -- hoặc COALESCE' },
-      sqlite: { code: 'COALESCE(${1:column}, ${2:default_value})', example: 'COALESCE(status, \'unknown\') -- hoặc IFNULL' },
-      sqlServer: { code: 'ISNULL(${1:column}, ${2:default_value})', example: 'ISNULL(status, \'unknown\') -- hoặc COALESCE' },
+      mySQL: { code: 'IFNULL(${1:column}, ${2:default_value})', example: 'IFNULL(status, \'unknown\') -- or COALESCE' },
+      sqlite: { code: 'COALESCE(${1:column}, ${2:default_value})', example: 'COALESCE(status, \'unknown\') -- or IFNULL' },
+      sqlServer: { code: 'ISNULL(${1:column}, ${2:default_value})', example: 'ISNULL(status, \'unknown\') -- or COALESCE' },
       oracle: { code: 'NVL(${1:column}, ${2:default_value})', example: 'NVL(status, \'unknown\')' },
       mongoDB: { code: '{\n  $ifNull: ["$${1:column}", ${2:default_value}]\n}', example: '{\n  $ifNull: ["$status", "unknown"]\n}' }
     }
@@ -139,7 +139,7 @@ export const SNIPPETS: Snippet[] = [
   {
     id: 'cond_case',
     name: 'CASE WHEN Statement',
-    description: 'Câu lệnh rẽ nhánh điều kiện logic.',
+    description: 'Conditional branching expression based on logical conditions.',
     category: 'conditionals',
     dialects: {
       postgreSQL: { code: 'CASE WHEN ${1:condition} THEN ${2:value1} ELSE ${3:value2} END', example: 'CASE WHEN age >= 18 THEN \'Adult\' ELSE \'Minor\' END' },
@@ -153,7 +153,7 @@ export const SNIPPETS: Snippet[] = [
   {
     id: 'win_row_number',
     name: 'Row Number (Window)',
-    description: 'Đánh số thứ tự tăng dần cho các dòng trong nhóm phân vùng.',
+    description: 'Assign an incrementing sequence number to rows within each partition.',
     category: 'window',
     dialects: {
       postgreSQL: { code: 'ROW_NUMBER() OVER (PARTITION BY ${1:partition_col} ORDER BY ${2:sort_col})', example: 'ROW_NUMBER() OVER (PARTITION BY group_id ORDER BY created_at DESC)' },
